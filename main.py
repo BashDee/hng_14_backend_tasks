@@ -6,12 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes import router
+from app.db import init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from httpx import AsyncClient, Timeout
 
+    init_db()
     app.state.http_client = AsyncClient(timeout=Timeout(5.0))
     try:
         yield
