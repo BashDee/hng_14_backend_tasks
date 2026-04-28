@@ -6,8 +6,13 @@ from httpx import AsyncClient, HTTPError
 
 from app.services.genderize import UpstreamServiceError
 
+import os
 
-NATIONALIZE_URL = "https://api.nationalize.io"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+nationalize_url = os.getenv("NATIONALIZE_URL")
 NATIONALIZE_INVALID_RESPONSE_MESSAGE = "Nationalize returned an invalid response"
 
 
@@ -23,7 +28,7 @@ class NationalizeService:
 
     async def classify(self, name: str) -> NationalizePayload:
         try:
-            response = await self._client.get(NATIONALIZE_URL, params={"name": name})
+            response = await self._client.get(nationalize_url, params={"name": name})
             response.raise_for_status()
             body = response.json()
         except (HTTPError, ValueError, TypeError) as exc:

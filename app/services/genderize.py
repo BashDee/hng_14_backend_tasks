@@ -7,8 +7,14 @@ from httpx import AsyncClient, HTTPError
 
 from app.models.classify import ClassifyData, SuccessResponse
 
+import os
 
-GENDERIZE_URL = "https://api.genderize.io"
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+genderize_url = os.getenv("GENDERIZE_URL")
 
 
 class NoPredictionAvailableError(Exception):
@@ -53,7 +59,7 @@ class GenderizeService:
     async def classify(self, name: str) -> SuccessResponse:
         try:
             response = await self._client.get(
-                GENDERIZE_URL,
+                genderize_url,
                 params={"name": name},
             )
             response.raise_for_status()

@@ -6,8 +6,15 @@ from httpx import AsyncClient, HTTPError
 
 from app.services.genderize import UpstreamServiceError
 
+import os
 
-AGIFY_URL = "https://api.agify.io"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+agify_url = os.getenv("AGIFY_URL")
+
+
 AGIFY_INVALID_RESPONSE_MESSAGE = "Agify returned an invalid response"
 
 
@@ -22,7 +29,7 @@ class AgifyService:
 
     async def classify(self, name: str) -> AgifyPayload:
         try:
-            response = await self._client.get(AGIFY_URL, params={"name": name})
+            response = await self._client.get(agify_url, params={"name": name})
             response.raise_for_status()
             body = response.json()
         except (HTTPError, ValueError, TypeError) as exc:
