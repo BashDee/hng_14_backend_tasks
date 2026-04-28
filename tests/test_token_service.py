@@ -335,6 +335,15 @@ class TestTokenManager:
         with pytest.raises(RevokedTokenError):
             token_manager.refresh_access_token(pair.refresh_token)
 
+    def test_revoke_refresh_token_marks_token_revoked(self, token_manager, mock_token_repository):
+        """Test that logout revokes the refresh token server-side."""
+        pair = token_manager.issue_tokens(github_id=42, login="octocat")
+
+        token_manager.revoke_refresh_token(pair.refresh_token)
+
+        mock_token_repository.revoke_jti.assert_called_once()
+        mock_token_repository.is_jti_revoked.assert_called_once()
+
 
 # ==============================================================================
 # Integration Tests: Callback and Refresh Endpoints
@@ -470,3 +479,20 @@ def test_refresh_endpoint_rejects_missing_token(auth_client):
     )
     
     assert response.status_code in (400, 401)
+
+
+def test_logout_endpoint_revokes_refresh_token(auth_client):
+    """Test that /auth/logout revokes a refresh token server-side."""
+    import json
+
+    token_manager = auth_client.app.state.token_manager
+    pair = token_manager.issue_tokens(github_id=42, login="octocat")
+
+    response = auth_client.post(
+        "/auth/logout",
+        content=json.dumps({"refresh_token": pair.refresh_token}),
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "success"}

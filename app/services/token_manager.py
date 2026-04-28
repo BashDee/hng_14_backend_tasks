@@ -78,3 +78,25 @@ class TokenManager:
         self._repo.revoke_jti(jti)
 
         return new_token_data
+
+    def revoke_refresh_token(self, refresh_token: str) -> None:
+        """
+        Revoke a refresh token without issuing a replacement pair.
+
+        Used by logout to invalidate the server-side refresh token state.
+
+        Args:
+            refresh_token: Client's current refresh token
+
+        Raises:
+            InvalidTokenError: Token signature/format invalid
+            ExpiredTokenError: Token has expired
+            RevokedTokenError: Token already revoked
+        """
+        payload = self._jwt.verify_refresh_token(refresh_token)
+        jti = payload.jti
+
+        if self._repo.is_jti_revoked(jti):
+            raise RevokedTokenError("Token revoked or already used")
+
+        self._repo.revoke_jti(jti)

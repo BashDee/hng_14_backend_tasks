@@ -152,3 +152,34 @@ async def refresh_token(
         return _build_error_response(status_code, message)
     except Exception as exc:
         return _build_error_response(500, "Token refresh failed")
+
+
+@router.post(
+    "/logout",
+    responses={
+        200: {"description": "Refresh token revoked"},
+        400: {"model": ErrorResponse, "description": "Missing or invalid token"},
+        401: {"model": ErrorResponse, "description": "Token expired or already revoked"},
+    },
+)
+async def logout(
+    request: Request,
+    body: RefreshTokenRequest,
+):
+    """
+    Revoke the current refresh token server-side.
+
+    Logout is implemented as refresh-token revocation so the token can no
+    longer be used to mint new access tokens.
+    """
+    token_manager = _get_token_manager(request)
+
+    try:
+        token_manager.revoke_refresh_token(body.refresh_token)
+        return JSONResponse(status_code=200, content={"status": "success"})
+    except JWTError as exc:
+        status_code = getattr(exc, "status_code", 400)
+        message = exc.message
+        return _build_error_response(status_code, message)
+    except Exception:
+        return _build_error_response(500, "Logout failed")
