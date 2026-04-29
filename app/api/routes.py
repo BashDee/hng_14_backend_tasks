@@ -9,6 +9,7 @@ from app.services.profiles import ProfileNotFoundError, ProfilesService
 
 router = APIRouter(prefix="/api", tags=["classification"])
 INVALID_QUERY_PARAMS_MESSAGE = "Invalid query parameters"
+PROFILE_API_VERSION_HEADER = "X-API-Version"
 
 
 def _build_error_response(status_code: int, message: str) -> JSONResponse:
@@ -16,6 +17,13 @@ def _build_error_response(status_code: int, message: str) -> JSONResponse:
         status_code=status_code,
         content=ErrorResponse(message=message).model_dump(),
     )
+
+
+def _require_profile_api_version(request: Request) -> JSONResponse | None:
+    version = request.headers.get(PROFILE_API_VERSION_HEADER)
+    if version is None or version.strip() == "":
+        return _build_error_response(400, "API version header required")
+    return None
 
 
 def _single_query_param(request: Request, key: str) -> str | None:
@@ -161,13 +169,20 @@ async def classify(request: Request):
     responses={
         200: {"description": "Profile already exists"},
         201: {"description": "Profile created"},
-        400: {"model": ErrorResponse, "description": "Missing or empty name"},
+        400: {
+            "model": ErrorResponse,
+            "description": "API version header required or missing/empty name",
+        },
         422: {"model": ErrorResponse, "description": "Invalid type"},
         502: {"model": ErrorResponse, "description": "Upstream service failure"},
         500: {"model": ErrorResponse, "description": "Unexpected server error"},
     },
 )
 async def create_profile(request: Request):
+    version_error = _require_profile_api_version(request)
+    if version_error is not None:
+        return version_error
+
     try:
         body = await request.json()
     except Exception:
@@ -189,12 +204,19 @@ async def create_profile(request: Request):
     summary="Search profiles with natural language",
     responses={
         200: {"description": "Profiles fetched"},
-        400: {"model": ErrorResponse, "description": "Missing or invalid query"},
+        400: {
+            "model": ErrorResponse,
+            "description": "API version header required or missing/invalid query",
+        },
         422: {"model": ErrorResponse, "description": "Invalid query parameters"},
         500: {"model": ErrorResponse, "description": "Unexpected server error"},
     },
 )
 async def search_profiles(request: Request):
+    version_error = _require_profile_api_version(request)
+    if version_error is not None:
+        return version_error
+
     for key in request.query_params.keys():
         if key not in {"q", "page", "limit"}:
             return _build_error_response(422, INVALID_QUERY_PARAMS_MESSAGE)
@@ -228,11 +250,16 @@ async def search_profiles(request: Request):
     summary="Get profile by ID",
     responses={
         200: {"description": "Profile found"},
+        400: {"model": ErrorResponse, "description": "API version header required"},
         404: {"model": ErrorResponse, "description": "Profile not found"},
         500: {"model": ErrorResponse, "description": "Unexpected server error"},
     },
 )
 async def get_profile(profile_id: str, request: Request):
+    version_error = _require_profile_api_version(request)
+    if version_error is not None:
+        return version_error
+
     service = ProfilesService(request.app.state.http_client)
     try:
         payload = service.get_profile(profile_id)
@@ -247,12 +274,17 @@ async def get_profile(profile_id: str, request: Request):
     summary="Get all profiles",
     responses={
         200: {"description": "Profiles fetched"},
+        400: {"model": ErrorResponse, "description": "API version header required"},
         500: {"model": ErrorResponse, "description": "Unexpected server error"},
     },
 )
 async def get_profiles(
     request: Request,
 ):
+    version_error = _require_profile_api_version(request)
+    if version_error is not None:
+        return version_error
+
     try:
         query = _parse_profiles_list_query(request)
     except (ValueError, TypeError):
@@ -268,11 +300,16 @@ async def get_profiles(
     summary="Delete profile by ID",
     responses={
         204: {"description": "Profile deleted"},
+        400: {"model": ErrorResponse, "description": "API version header required"},
         404: {"model": ErrorResponse, "description": "Profile not found"},
         500: {"model": ErrorResponse, "description": "Unexpected server error"},
     },
 )
 async def delete_profile(profile_id: str, request: Request):
+    version_error = _require_profile_api_version(request)
+    if version_error is not None:
+        return version_error
+
     service = ProfilesService(request.app.state.http_client)
     deleted = service.delete_profile(profile_id)
     if not deleted:

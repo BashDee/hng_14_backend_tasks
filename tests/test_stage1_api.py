@@ -64,7 +64,12 @@ def isolated_client(tmp_path, monkeypatch):
             github_id=42,
             login="octocat",
         )
-        client.headers.update({"Authorization": f"Bearer {access_token}"})
+        client.headers.update(
+            {
+                "Authorization": f"Bearer {access_token}",
+                "X-API-Version": "1",
+            }
+        )
         yield client
 
 
@@ -101,7 +106,12 @@ def admin_client(tmp_path, monkeypatch):
             github_id=99,
             login="admin_user",
         )
-        client.headers.update({"Authorization": f"Bearer {access_token}"})
+        client.headers.update(
+            {
+                "Authorization": f"Bearer {access_token}",
+                "X-API-Version": "1",
+            }
+        )
         yield client
 
 
@@ -148,6 +158,15 @@ def install_upstream_custom(client: TestClient, responses_by_service: dict[str, 
 
 def create_profile(client: TestClient, name: str):
     return client.post("/api/profiles", json={"name": name})
+
+
+def request_without_api_version(client: TestClient, method: str, url: str, **kwargs):
+    previous_version = client.headers.pop("X-API-Version", None)
+    try:
+        return client.request(method, url, **kwargs)
+    finally:
+        if previous_version is not None:
+            client.headers["X-API-Version"] = previous_version
 
 
 def test_stage0_classify_success(isolated_client):
@@ -210,6 +229,26 @@ def test_create_profile_validation_status_mappings(isolated_client, body, expect
 
     assert response.status_code == expected_status
     assert response.json() == {"status": "error", "message": expected_message}
+
+
+@pytest.mark.parametrize(
+    "method, url, kwargs",
+    [
+        ("POST", "/api/profiles", {"json": {"name": "ella"}}),
+        ("GET", "/api/profiles", {}),
+        ("GET", "/api/profiles/search?q=young", {}),
+        ("GET", "/api/profiles/00000000-0000-7000-8000-000000000000", {}),
+        ("DELETE", "/api/profiles/00000000-0000-7000-8000-000000000000", {}),
+    ],
+)
+def test_profile_endpoints_require_api_version_header(isolated_client, method, url, kwargs):
+    response = request_without_api_version(isolated_client, method, url, **kwargs)
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "status": "error",
+        "message": "API version header required",
+    }
 
 
 def test_create_profile_success_persists_and_returns_contract(isolated_client):
