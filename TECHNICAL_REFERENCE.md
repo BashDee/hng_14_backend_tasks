@@ -114,6 +114,18 @@ Primary status mappings:
 
 #### POST /api/profiles
 
+Versioning requirement:
+
+- All profile endpoints require `X-API-Version: 1`.
+- Missing header returns `400` with:
+
+```json
+{
+  "status": "error",
+  "message": "API version header required"
+}
+```
+
 Request body:
 
 ```json
